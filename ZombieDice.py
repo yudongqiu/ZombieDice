@@ -358,7 +358,7 @@ def main():
             game_output.write('Game %-4d '%(i+1))
             game.reset()
             # Let's rotate the order
-            if args.fixorder and len(game.players) > 1:
+            if not args.fixorder and len(game.players) > 1:
                 game.players = game.players[1:] + [game.players[0]]
             winners, nround = game.play()
             game_output.write('Round %2d : '%nround)
