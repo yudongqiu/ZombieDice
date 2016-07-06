@@ -288,9 +288,10 @@ class Player(object):
             name = name[:-1]
         # search for the strategy file
         for f in os.listdir('.'):
-            if name.lower() in f.lower() and os.path.splitext(f)[1] == '.py':
+            filename, fileext = os.path.splitext(f)
+            if name.lower() == filename.lower() and fileext == '.py':
                 print('-- strategy found in %s'%f)
-                p = __import__(os.path.splitext(f)[0])
+                p = __import__(filename)
                 self.strategy = p.strategy
         # if not found, use manual input
         if not hasattr(self, 'strategy'):
