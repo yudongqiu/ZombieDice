@@ -300,6 +300,42 @@ def U_dice(state, level=0, quality=0.):
 
     return (result, quality)
 
+@memo
+def estimate_u(scores, myidx, me, goal):
+    myscore = scores[myidx]
+    max_before = max(scores[:myidx]) if myidx > 0 else 0
+    max_after = max(scores[myidx+1:]) if myidx < len(scores)-1 else 0
+    damping = 5 # add to each player to damp the low scores
+    if myidx == me:
+        # comparing to the maxscore before me
+        if max_before > max_after:
+            buff_above_goal = (max_before - goal + 1)**3 if max_before >= goal else 0
+            fixed_before = max_before + buff_above_goal + damping
+            buff_close_to_goal = (myscore + 4 - goal)**3 if myscore+4 > goal else 0 # the buff for me being close to goal
+            fixed_me = myscore + buff_close_to_goal + damping
+            result = fixed_me / (fixed_me + fixed_before)
+        else: # comparing to players after me
+            buff_above_goal = (myscore - goal + 1)**3 if myscore >= goal else 0
+            fixed_me = myscore + buff_above_goal + damping
+            buff_close_to_goal = (max_after + 4 - goal)**3 if max_after+4 > goal else 0
+            fixed_after = max_after + buff_close_to_goal + damping
+            result = fixed_me / (fixed_me + fixed_after)
+    else:
+        me_score = scores[me]
+        if myidx < me:
+            buff_above_goal = (myscore - goal + 1)**3 if myscore >= goal else 0
+            fixed_myidx = myscore + buff_above_goal + damping
+            buff_close_to_goal = (me_score + 4 - goal)**3 if me_score+4 > goal else 0
+            fixed_me = me_score + buff_close_to_goal + damping
+        elif myidx > me:
+            buff_above_goal = (me_score - goal + 1)**3 if me_score >= goal else 0
+            fixed_me = me_score + buff_above_goal + damping
+            buff_close_to_goal = (myscore + 4 - goal)**3 if myscore+4 > goal else 0
+            fixed_myidx = myscore + buff_close_to_goal + damping
+        result = fixed_me  / (fixed_me + fixed_myidx)
+    quality = 0.
+    return result, quality
+
 def zombie_actions(state):
     bag, dices, players, myidx, goal, me = state
     # cut off on goal + 10 brains
