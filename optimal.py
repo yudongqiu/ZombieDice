@@ -64,17 +64,6 @@ def strategy(state):
     playing = state['playing']
     goal = state['goal']
 
-    # If I haven't got any brains yet
-    if n_brains == 0:
-        return 'roll'
-    # keep rolling if I'm losing
-    max_score = max([p.score for p in players])
-    if max_score >= 13 and max_score > playing.score:
-        if playing.score + n_brains < max_score:
-            return 'roll'
-        else:
-            return 'hold'
-
     # simplify the state and make it a tuple for caching
     # bag: (n_green, n_yellow, n_red)
     # dices: (green:(n_brain, n_runner, n_shotgun), yellow:(n_brain, n_runner, n_shotgun), red:(n_brain, n_runner, n_shotgun))
@@ -97,10 +86,6 @@ def strategy(state):
     players = tuple(p[1] for p in players)
 
     state = (bag, dices, players, myidx, goal, me)
-
-    cachefilename = 'cachehigh'
-    if os.path.exists(cachefilename) and not hasattr(U_dice, 'cachehigh'):
-        U_dice.cachehigh = pickle.load(open(cachefilename,"rb"))
 
     #state = (tuple(sorted(bag)), tuple(sorted([tuple(d) for d in dices])), tuple([tuple(p) for p in players]), players.index(me))
     # get best action
@@ -329,7 +314,7 @@ def U_dice(state, level=0, quality=0.):
     #U_dice.pendingstates.pop()
     #print('pending state removed:',state)
     # put the high quality results into the high quality cache
-    if quality > 0.92:
+    if quality > 0.80:
         U_dice.cachehigh[state] = (result, quality)
     else:
         U_dice.cachelow[state] = (result, quality)
@@ -419,26 +404,20 @@ def roll(state):
     return state
 
 
+# load the cachehigh
+if os.path.exists('cachehigh'):
+    U_dice.cachehigh = pickle.load( open('cachehigh',"rb") )
+    n_exist = len(U_dice.cachehigh)
+    print('Successfully loaded %d high quality cache data'%n_exist)
+else:
+    n_exist = 0
+    print("cachehigh is not found, I will be very stupid!")
+
 # training
 if __name__ == '__main__':
     import sys
     goal = 13
     me = 0
-    #state = ((4, 4, 3), ((2, 0, 0), (0, 0, 2), (0, 0, 0)), (10, 11), 0)
-    #state = hold(state)
-
-    #Q_dice(state, 'hold', level=0)
-    #Q_dice(state, 'roll', level=0)
-    #print(U_dice(state, level=1))
-
-    # Load previous highcache from pickled file
-    n_exist = 0
-    cachefilename = 'cachehigh'
-    if os.path.exists(cachefilename):
-        U_dice.cachehigh = pickle.load( open(cachefilename,"rb") )
-        n_exist = len(U_dice.cachehigh)
-        print('Successfully loaded %d high quality cache data'%n_exist)
-        #print(U_dice.cachehigh)
 
     starting_score = (int(sys.argv[1]), int(sys.argv[2]))
     starting_player = 0
@@ -447,13 +426,12 @@ if __name__ == '__main__':
     print('Starting computing from state', state)
     level = 0
     # compute rolling win rate
-    print(U_dice(state))
-    #print('hold', Q_dice(state, 'hold', level=level))
-    #print('roll', Q_dice(state, 'roll', level=level))
+    print('hold', Q_dice(state, 'hold', level=level))
+    print('roll', Q_dice(state, 'roll', level=level))
     number_lowcache = len(U_dice.cachelow)
     print('%d is left in U_dice.cachelow'%(number_lowcache))
 
-    target_q = 0.92
+    target_q = 0.80
     l = list(U_dice.cachelow.items())
     for k,v in l[:]:
         #print(k, v)
@@ -465,3 +443,14 @@ if __name__ == '__main__':
         # save the highcache to pickled file
         pickle.dump( U_dice.cachehigh, open(cachefilename,"wb") )
         print('Successfully updated U_dice.cachehigh data')
+
+def finish():
+    try:
+        if len(U_dice.cachehigh) > n_exist:
+            # save the highcache to pickled file
+            pickle.dump( U_dice.cachehigh, open("cachehigh","wb") )
+            print('Successfully updated U_dice.cachehigh data with %d states'%len(U_dice.cachehigh))
+        if len(U_dice.cachelow) > 0:
+            print("%d states were left in U_dice.cachelow"%len(U_dice.cachelow))
+    except:
+        pass
