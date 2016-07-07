@@ -292,7 +292,14 @@ class Player(object):
             if name.lower() == filename.lower() and fileext == '.py':
                 print('-- strategy found in %s'%f)
                 p = __import__(filename)
-                self.strategy = p.strategy
+                try:
+                    self.strategy = p.strategy
+                except:
+                    raise RuntimeError("Function strategy(state) is not found in %s"%filename)
+                try:
+                    self.finish = p.finish
+                except:
+                    pass
         # if not found, use manual input
         if not hasattr(self, 'strategy'):
             print('-- strategy file is not found, set as manual input.')
@@ -355,12 +362,16 @@ def main():
         game.fastmode = 2
         game_output = open('game_results.txt','w')
         winner_board = collections.OrderedDict([(p.name, 0) for p in game.players])
-        for i in range(args.ngames):
+        if not args.fixorder:
+            nplayers = len(args.players)
+            for i in range(args.ngames):
+                 playone(i)
+                 # switch the order of the players
+                 if i == args.ngames // nplayers:
+                      game.players = game.players[1:] + [game.players[0]]
+        def playone(i):
             game_output.write('Game %-4d '%(i+1))
             game.reset()
-            # Let's rotate the order
-            if not args.fixorder and len(game.players) > 1:
-                game.players = game.players[1:] + [game.players[0]]
             winners, nround = game.play()
             game_output.write('Round %2d : '%nround)
             for w in winners:
@@ -371,9 +382,12 @@ def main():
         print("Name    |   Games Won")
         for name, nwin in winner_board.items():
             print("%-7s | %7d"%(name, nwin))
-
-
-
+    # Let the players finish their game
+    for p in game.players:
+        try:
+            p.finish()
+        except:
+            pass
 
 if __name__ == "__main__":
     main()
