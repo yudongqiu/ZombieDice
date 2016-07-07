@@ -64,17 +64,6 @@ def strategy(state):
     playing = state['playing']
     goal = state['goal']
 
-    # If I haven't got any brains yet
-    if n_brains == 0:
-        return 'roll'
-    # keep rolling if I'm losing
-    max_score = max([p.score for p in players])
-    if max_score >= 13 and max_score > playing.score:
-        if playing.score + n_brains < max_score:
-            return 'roll'
-        else:
-            return 'hold'
-
     # simplify the state and make it a tuple for caching
     # bag: (n_green, n_yellow, n_red)
     # dices: (green:(n_brain, n_runner, n_shotgun), yellow:(n_brain, n_runner, n_shotgun), red:(n_brain, n_runner, n_shotgun))
@@ -98,42 +87,20 @@ def strategy(state):
 
     state = (bag, dices, players, myidx, goal, me)
 
-    cachefilename = 'cachehigh'
-    if os.path.exists(cachefilename) and not hasattr(U_dice, 'cachehigh'):
-        U_dice.cachehigh = pickle.load(open(cachefilename,"rb"))
-
-    #state = (tuple(sorted(bag)), tuple(sorted([tuple(d) for d in dices])), tuple([tuple(p) for p in players]), players.index(me))
-    # get best action
-    #if hasattr(U_dice, 'cache'):
-    #    print("U_dice cache length:", len(U_dice.cache))
-
-    # gather the result with the max win rate in the possible actions
-    result = max([(action, Q_dice(state, action)) for action in zombie_actions(state)], key=lambda x:x[1])
-
-    # if I'm about to win or lose
-    #if result[1][0] >= 0.9 or result[1][0] <= 0.1:
-    #    # save the updated cache to file
-    #    print('Updating cachehigh!')
-    #    pickle.dump( U_dice.cachehigh, open(cachefilename,"wb") )
-
-
-    return result[0]
-
-    #best_action(state, zombie_actions, Q_dice, U_dice)
+    return best_action(state)
 
 # For the rest of the code, state is now simplified
 
-def best_action(state, actions, Q, U):
-    "Return the optimal action for a state, given U."
-    def EU(action): return Q(state, action, level=0)
-    return max(actions(state), key=EU)
+@memo
+def best_action(state):
+    "Return the optimal action for a state"
+    def EU(action): return Q_dice(state, action, level=0)
+    return max(zombie_actions(state), key=EU)
 
-#@memo
-def Q_dice(state, action, level=0, quality=0.):
+def Q_dice(state, action, level=0):
     "The expected value of U of choosing action in state."
-    #print("Q_level", level)
     if action == 'hold':
-        result, result_qual = U_dice(hold(state), level=level, quality=quality)
+        result, result_qual = U_dice(hold(state), level=level)
     if action == 'roll':
         # going over all possible draws from bag and all possible rolled faces
         bag, dices, players, myidx, goal, me = state
@@ -148,7 +115,6 @@ def Q_dice(state, action, level=0, quality=0.):
             dices_counter = dices_with_color(colors)
             counted_dices = 0
             for rolled_dices, n_d in dices_counter:
-                #new_runners = rolled_dices.T[1]
                 new_runners = tuple(d[1] for d in rolled_dices)
                 n_new_runners = sum(new_runners)
                 if n_new_runners != 3: # skip the 3 runners
@@ -156,21 +122,15 @@ def Q_dice(state, action, level=0, quality=0.):
                     bag1 = updated_bag(bag, draw_colors, new_runners)
                     new_state = (bag1, dices1, players, myidx, goal, me) # update the bag and dices before passing to roll
                     rolled_state = roll(new_state)
-                    #if level > 10 and rolled_state in U_dice.pendingstates:
-                    #    continue
-                    u, qual = U_dice(roll(new_state), level=level, quality=quality)
+                    u, qual = U_dice(roll(new_state), level=level)
                     q_color += u * n_d
                     qual_color += qual * n_d # accumulate quality over dices
                     counted_dices += n_d
             result += q_color / counted_dices * n_c  # there are 6x6x6 possibilities for 3 faces
             result_qual += qual_color / counted_dices * n_c # accumulate quality over color
-            #print(colors, 'result: ', result, float(sum(cc[1] for cc in possible_colors_counter)))
         f_possible_colors = 1. / sum(cc[1] for cc in possible_colors_counter) # factor for all possible_colors
         result *= f_possible_colors
         result_qual *= f_possible_colors
-    #if level == 0:
-    #    print(level, state, action, result)
-
     return result, result_qual
 
 @memo
@@ -275,13 +235,6 @@ def U_dice(state, level=0, quality=0.):
       except:
         pass
 
-    # store the pending states to prevent infinite loop
-    #if not hasattr(U_dice, 'pendingstates'):
-    #    U_dice.pendingstates = []
-
-    #U_dice.pendingstates.append(state)
-    #print('pending state added:  ',state)
-
     # get information
     bag, dices, players, myidx, goal, me = state
 
@@ -294,7 +247,7 @@ def U_dice(state, level=0, quality=0.):
             quality = 1.
             # no need to proceed to next Q_dice here because game is ending at this point
         else: # game is not ending, we need to go to next round
-            result, quality = U_dice((bag, dices, players, 0, goal, me), level=level, quality=quality)
+            result, quality = U_dice((bag, dices, players, 0, goal, me), level=level)
     # If this is a player
     else:
         scores = list(players)
@@ -321,9 +274,9 @@ def U_dice(state, level=0, quality=0.):
             # go to the next recursive level of calculating winning rate
             if myidx == me:
                 # if it's me playing, i'm maximizing the chance I win
-                result, quality = max(Q_dice(state, action, level=level+1, quality=quality) for action in zombie_actions(state))
+                result, quality = max(Q_dice(state, action, level=level+1) for action in zombie_actions(state))
             else: # if it's not me playing, they will minimize the chance I win
-                result, quality = min(Q_dice(state, action, level=level+1, quality=quality) for action in zombie_actions(state))
+                result, quality = min(Q_dice(state, action, level=level+1) for action in zombie_actions(state))
 
     # put the high quality results into the high quality cache
     try:
@@ -347,48 +300,13 @@ def U_dice(state, level=0, quality=0.):
 
     return (result, quality)
 
-@memo
-def estimate_u(scores, myidx, me, goal):
-    myscore = scores[myidx]
-    max_before = max(scores[:myidx]) if myidx > 0 else 0
-    max_after = max(scores[myidx+1:]) if myidx < len(scores)-1 else 0
-    damping = 5 # add to each player to damp the low scores
-    if myidx == me:
-        # comparing to the maxscore before me
-        if max_before > max_after:
-            buff_above_goal = (max_before - goal + 1)**3 if max_before >= goal else 0
-            fixed_before = max_before + buff_above_goal + damping
-            buff_close_to_goal = (myscore + 4 - goal)**3 if myscore+4 > goal else 0 # the buff for me being close to goal
-            fixed_me = myscore + buff_close_to_goal + damping
-            result = fixed_me / (fixed_me + fixed_before)
-        else: # comparing to players after me
-            buff_above_goal = (myscore - goal + 1)**3 if myscore >= goal else 0
-            fixed_me = myscore + buff_above_goal + damping
-            buff_close_to_goal = (max_after + 4 - goal)**3 if max_after+4 > goal else 0
-            fixed_after = max_after + buff_close_to_goal + damping
-            result = fixed_me / (fixed_me + fixed_after)
-    else:
-        me_score = scores[me]
-        if myidx < me:
-            buff_above_goal = (myscore - goal + 1)**3 if myscore >= goal else 0
-            fixed_myidx = myscore + buff_above_goal + damping
-            buff_close_to_goal = (me_score + 4 - goal)**3 if me_score+4 > goal else 0
-            fixed_me = me_score + buff_close_to_goal + damping
-        elif myidx > me:
-            buff_above_goal = (me_score - goal + 1)**3 if me_score >= goal else 0
-            fixed_me = me_score + buff_above_goal + damping
-            buff_close_to_goal = (myscore + 4 - goal)**3 if myscore+4 > goal else 0
-            fixed_myidx = myscore + buff_close_to_goal + damping
-        result = fixed_me  / (fixed_me + fixed_myidx)
-    quality = 0.
-    return result, quality
-
 def zombie_actions(state):
     bag, dices, players, myidx, goal, me = state
     # cut off on goal + 10 brains
     pending = sum(d[0] for d in dices)
     if pending == 0:
         return ['roll']
+    # if we already got a very high score, do not cotinue to roll
     if players[myidx] + pending > goal + 5:
         return ['hold']
     else:
@@ -422,39 +340,33 @@ def roll(state):
     return state
 
 
-# training
+# load the cachehigh
+if os.path.exists('cachehigh'):
+    U_dice.cachehigh = pickle.load( open('cachehigh',"rb") )
+    n_exist = len(U_dice.cachehigh)
+    print('Successfully loaded %d high quality cache data'%n_exist)
+else:
+    n_exist = 0
+    print("cachehigh is not found, I will be very stupid!")
+
+# improving
 if __name__ == '__main__':
     import sys
     goal = 13
-    me = 0
-    #state = ((4, 4, 3), ((2, 0, 0), (0, 0, 2), (0, 0, 0)), (10, 11), 0)
-    #state = hold(state)
-
-    #Q_dice(state, 'hold', level=0)
-    #Q_dice(state, 'roll', level=0)
-    #print(U_dice(state, level=1))
 
     # Load previous highcache from pickled file
     n_exist = 0
     cachefilename = 'cachehigh'
-    if os.path.exists(cachefilename):
+    if not hasattr(U_dice, 'cachehigh') and os.path.exists(cachefilename):
         U_dice.cachehigh = pickle.load( open(cachefilename,"rb") )
         n_exist = len(U_dice.cachehigh)
         print('Successfully loaded %d high quality cache data'%n_exist)
-        #print(U_dice.cachehigh)
 
-    #starting_score = (int(sys.argv[1]), int(sys.argv[2]))
-    #starting_player = 0
     for state in sorted(U_dice.cachehigh.keys(), key=lambda x: sorted(x[2], reverse=True), reverse=True):
         if U_dice.cachehigh[state][1] > 0.998: continue
         #state = ((6, 4, 3), ((0, 0, 0), (0, 0, 0), (0, 0, 0)), starting_score, starting_player, goal, me)
         print('Starting computing from state', state)
-        level = 0
-        # compute rolling win rate
-        U_dice(state, level=level)
-        #Q_dice(state, 'hold', level=level)
-        #Q_dice(state, 'roll', level=level)
-             
+        U_dice(state, level=0)
 
     pickle.dump( U_dice.cachehigh, open(cachefilename,"wb") )
     print('Successfully updated U_dice.cachehigh data')
