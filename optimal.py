@@ -64,6 +64,14 @@ def strategy(state):
     playing = state['playing']
     goal = state['goal']
 
+    # if there is someone else got > 13 brains, roll until I got more brains
+    max_score = max([p.score for p in players])
+    if max_score >= strategy.goal:
+        if me.score + n_brains < max_score:
+            return 'roll'
+        else:
+            return 'hold'
+
     # simplify the state and make it a tuple for caching
     # bag: (n_green, n_yellow, n_red)
     # dices: (green:(n_brain, n_runner, n_shotgun), yellow:(n_brain, n_runner, n_shotgun), red:(n_brain, n_runner, n_shotgun))
