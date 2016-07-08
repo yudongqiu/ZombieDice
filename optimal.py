@@ -69,8 +69,6 @@ def strategy(state):
     if max_score >= strategy.goal:
         if me.score + n_brains < max_score:
             return 'roll'
-        else:
-            return 'hold'
 
     # simplify the state and make it a tuple for caching
     # bag: (n_green, n_yellow, n_red)
