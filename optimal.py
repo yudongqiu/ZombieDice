@@ -67,8 +67,10 @@ def strategy(state):
     # if there is someone else got > 13 brains, roll until I got more brains
     max_score = max([p.score for p in players])
     if max_score >= goal:
-        if me.score + n_brains < max_score:
+        if playing.score + n_brains < max_score:
             return 'roll'
+        elif playing.score + n_brains > goal + 5:
+            return 'hold'
 
     # simplify the state and make it a tuple for caching
     # bag: (n_green, n_yellow, n_red)
