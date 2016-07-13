@@ -415,7 +415,7 @@ def finish():
             # save the highcache to pickled file
             if os.path.exists('cachehigh'):
                 pickle.dump( U_dice.cachehigh, open("cachehigh","wb") )
-            elif if os.path.exists('cachehigh.gz'):
+            elif os.path.exists('cachehigh.gz'):
                 pickle.dump( U_dice.cachehigh, gzip.open("cachehigh.gz","wb") )
             print('Successfully updated U_dice.cachehigh data with %d states'%len(U_dice.cachehigh))
     except:
