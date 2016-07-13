@@ -69,6 +69,7 @@ def strategy(state):
     if max_score >= goal:
         if playing.score + n_brains < max_score:
             return 'roll'
+        # if I am the highest and I got 5 more brains than goal
         elif playing.score + n_brains > goal + 5:
             return 'hold'
 
@@ -211,14 +212,12 @@ def dices_with_color(colors):
                                      'R' : (['brain']*1 + ['runner']*2 + ['shotgun']*3)}
     throw_result = [tuple(sorted(zip(colors,faces))) for faces in itertools.product(dices_with_color.diceinfo[colors[0]], dices_with_color.diceinfo[colors[1]], dices_with_color.diceinfo[colors[2]])]
     dices_counter = collections.Counter(throw_result).items()
-    #dices_counter.sort(key=lambda x:x[1], reverse=True)
     # transfer dice into 3*3 matrix
     result = []
     for dices_c_f, n_d in dices_counter:
         dice_transferred = [[0 for _ in range(3)] for _ in range(3)]
         for dice in dices_c_f:
             dice_transferred['GYR'.index(dice[0])][['brain','runner','shotgun'].index(dice[1])] += 1
-        #result.append((dice_transferred, n_d))
         result.append(( tuple(tuple(i) for i in dice_transferred) ,n_d))
     return result
 
@@ -266,16 +265,9 @@ def U_dice(state, level=0):
         if myidx == len(players)-1 and myscore >= goal and myscore > max_other_score:
             result = 1. if myidx == me else 0.
             quality = 1.
-        # If not the last player, don't keep rolling infinitely, you win if you got so many points
-        #elif myscore > goal + 8:
-        #    result = 1. if myidx == me else 0.
-        #    quality = 1.
         # If recursion level is high, return an estimation with quality 0
         elif level > 7:
             result, quality = estimate_u(scores, myidx, me, goal)
-            # if me_score = 12 and max_other_score = 12 and mydix == me: 0.5
-            # me : 12 , other:12 and mydix != me: 0.05
-
         # If no one is winning right now, keep searching for winning conditions
         else:
             # go to the next recursive level of calculating winning rate
@@ -373,6 +365,11 @@ if os.path.exists('cachehigh'):
     U_dice.cachehigh = pickle.load( open('cachehigh',"rb") )
     n_exist = len(U_dice.cachehigh)
     print('Successfully loaded %d high quality cache data'%n_exist)
+elif os.path.exists('cachehigh.gz'):
+    import gzip
+    U_dice.cachehigh = pickle.load( gzip.open('cachehigh.gz',"rb") )
+    n_exist = len(U_dice.cachehigh)
+    print('Successfully loaded %d conpressed high quality cache data'%n_exist)
 else:
     n_exist = 0
     print("cachehigh is not found, I will be very stupid!")
@@ -410,11 +407,13 @@ if __name__ == '__main__':
 
 def finish():
     try:
+        if len(U_dice.cachelow) > 0:
+            print("%d states were left in U_dice.cachelow"%len(U_dice.cachelow))
+            for (k,v) in U_dice.cachelow.items():
+                U_dice.cachehigh[k] = v
         if len(U_dice.cachehigh) > n_exist:
             # save the highcache to pickled file
             pickle.dump( U_dice.cachehigh, open("cachehigh","wb") )
             print('Successfully updated U_dice.cachehigh data with %d states'%len(U_dice.cachehigh))
-        if len(U_dice.cachelow) > 0:
-            print("%d states were left in U_dice.cachelow"%len(U_dice.cachelow))
     except:
         pass
