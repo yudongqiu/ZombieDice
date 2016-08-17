@@ -348,7 +348,7 @@ def main():
     parser.add_argument('-n', '--ngames', type=int, help='Play a number of games to gather statistics.')
     parser.add_argument('--fixorder', action='store_true', help='Fix the order of players in a multi-game series.')
     args = parser.parse_args()
-    
+
     # fix the .py after player names
     players = []
     for p in args.players:
@@ -376,13 +376,12 @@ def main():
                 winner_board[w] += 1
             game_output.write(' | '.join(['%s %3d'%(p.name, p.score) for p in game.players]) + '\n')
             game_output.flush()
-        if not args.fixorder:
-            nplayers = len(args.players)
-            for i in range(args.ngames):
-                playone(i)
-                # switch the order of the players
-                if i == args.ngames // nplayers:
-                     game.players = game.players[1:] + [game.players[0]]
+        nplayers = len(args.players)
+        for i in range(args.ngames):
+            playone(i)
+            # switch the order of the players
+            if i == args.ngames // nplayers and not args.fixorder:
+                 game.players = game.players[1:] + [game.players[0]]
         game_output.close()
         print("Name    |   Games Won")
         for name, nwin in winner_board.items():
